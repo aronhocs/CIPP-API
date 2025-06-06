@@ -28,7 +28,7 @@ function Invoke-CIPPStandardIntuneTemplate {
         UPDATECOMMENTBLOCK
             Run the Tools\Update-StandardsComments.ps1 script to update this comment block
     .LINK
-        https://docs.cipp.app/user-documentation/tenant/standards/list-standards/
+        https://docs.cipp.app/user-documentation/tenant/standards/list-standards
     #>
     param($Tenant, $Settings)
     ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'intuneTemplate'
@@ -84,6 +84,8 @@ function Invoke-CIPPStandardIntuneTemplate {
                 assignTo         = $Template.AssignTo
                 excludeGroup     = $Template.excludeGroup
                 remediate        = $Template.remediate
+                alert            = $Template.alert
+                report           = $Template.report
                 existingPolicyId = $ExistingPolicy.id
                 templateId       = $Template.TemplateList.value
                 customGroup      = $Template.customGroup
@@ -100,6 +102,8 @@ function Invoke-CIPPStandardIntuneTemplate {
                 assignTo         = $Template.AssignTo
                 excludeGroup     = $Template.excludeGroup
                 remediate        = $Template.remediate
+                alert            = $Template.alert
+                report           = $Template.report
                 existingPolicyId = $ExistingPolicy.id
                 templateId       = $Template.TemplateList.value
                 customGroup      = $Template.customGroup
@@ -116,14 +120,15 @@ function Invoke-CIPPStandardIntuneTemplate {
                 Set-CIPPIntunePolicy -TemplateType $TemplateFile.body.Type -Description $TemplateFile.description -DisplayName $TemplateFile.displayname -RawJSON $templateFile.rawJSON -AssignTo $TemplateFile.AssignTo -ExcludeGroup $TemplateFile.excludeGroup -tenantFilter $Tenant
             } catch {
                 $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
-                Write-LogMessage -API 'Standards' -tenant $tenant -message "Failed to create or update Intune Template $PolicyName, Error: $ErrorMessage" -sev 'Error'
+                Write-LogMessage -API 'Standards' -tenant $tenant -message "Failed to create or update Intune Template $($TemplateFile.displayname), Error: $ErrorMessage" -sev 'Error'
             }
         }
 
     }
 
-    if ($Settings.alert) {
-        foreach ($Template in $CompareList) {
+    if ($true -in $Settings.alert) {
+        foreach ($Template in $CompareList | Where-Object -Property alert -EQ $true) {
+            Write-Host "working on template alert: $($Template.displayname)"
             $AlertObj = $Template | Select-Object -Property displayname, description, compare, assignTo, excludeGroup, existingPolicyId
             if ($Template.compare) {
                 Write-StandardsAlert -message "Template $($Template.displayname) does not match the expected configuration." -object $AlertObj -tenant $Tenant -standardName 'IntuneTemplate' -standardId $Settings.templateId
@@ -139,13 +144,14 @@ function Invoke-CIPPStandardIntuneTemplate {
         }
     }
 
-    if ($Settings.report) {
-        foreach ($Template in $CompareList) {
+    if ($true -in $Settings.report) {
+        foreach ($Template in $CompareList | Where-Object -Property report -EQ $true) {
+            Write-Host "working on template report: $($Template.displayname)"
             $id = $Template.templateId
             $CompareObj = $Template.compare
             $state = $CompareObj ? $CompareObj : $true
             Set-CIPPStandardsCompareField -FieldName "standards.IntuneTemplate.$id" -FieldValue $state -TenantFilter $Tenant
         }
-        Add-CIPPBPAField -FieldName "policy-$id" -FieldValue $Compare -StoreAs bool -Tenant $tenant
+        #Add-CIPPBPAField -FieldName "policy-$id" -FieldValue $Compare -StoreAs bool -Tenant $tenant
     }
 }
